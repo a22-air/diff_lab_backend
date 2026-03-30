@@ -183,40 +183,124 @@ def diff(id1: int, id2: int):
 
     dwg = svgwrite.Drawing(size=(f"{width}px", f"{height}px"))
 
+    is_same = (
+        countA == countB and
+        radiusA == radiusB and
+        ringA == ringB
+    )
+
+    # Aは青固定
+    colorA = "blue"
+
+    # Bは差分で変える
+    colorB = "blue" if is_same else "red"
+
     # ④ 差分チェック
 
-    for i in range(countA):
-        angle = 2 * math.pi * i / countA
+    # ④ ここから「差分ロジック」を入れる
+    def is_close(a, b, tol=1e-3):
+        return abs(a - b) < tol
 
-        x = center_x + ringA * math.cos(angle)
-        y = center_y + ringA * math.sin(angle)
-
-        dwg.add(
-            dwg.circle(
-                center=(x, y),
-                r=radiusA,
-                fill="none",
-                stroke="blue",
-                stroke_width=2
-            )
+    def is_same_point(a, b):
+        return (
+            is_close(a[0], b[0]) and
+            is_close(a[1], b[1])
         )
 
+    # Aの点
+    pointsA = []
+    for i in range(countA):
+        angle = 2 * math.pi * i / countA
+        x = center_x + ringA * math.cos(angle)
+        y = center_y + ringA * math.sin(angle)
+        pointsA.append((x, y))
+
+    # Bの点
+    pointsB = []
     for i in range(countB):
-            angle = 2 * math.pi * i / countB
+        angle = 2 * math.pi * i / countB
+        x = center_x + ringB * math.cos(angle)
+        y = center_y + ringB * math.sin(angle)
+        pointsB.append((x, y))
 
-            x = center_x + ringB * math.cos(angle)
-            y = center_y + ringB * math.sin(angle)
+    # 判定関数
+    def in_points(target, points):
+        for px, py in points:
+            if is_close(target[0], px) and is_close(target[1], py):
+                return True
+        return False
 
-            dwg.add(
-                dwg.circle(
-                center=(x, y),
-                r=radiusB,
-                fill="none",
-                stroke="red",
-                stroke_width=2,
-                opacity=0.5
-                )
-            )
+    # --- A描画 ---
+    # A側
+    for (xA, yA) in pointsA:
+
+        matched = False
+
+        for (xB, yB) in pointsB:
+            if is_close(xA, xB) and is_close(yA, yB):
+                matched = True
+                break
+
+        if matched:
+            if is_close(radiusA, radiusB):
+                color = "gray"   # 完全一致
+            else:
+                color = "orange" # 位置は同じだがサイズ違い
+        else:
+            color = "blue"       # Aのみ
+
+        dwg.add(dwg.line(
+            start=(center_x, center_y),
+            end=(xA, yA),
+            stroke=color,
+            stroke_width=2
+        ))
+
+        dwg.add(dwg.circle(
+            center=(xA, yA),
+            r=radiusA,
+            fill=color
+        ))
+
+    # --- B描画 ---
+    for (xB, yB) in pointsB:
+
+        matched = False
+
+        for (xA, yA) in pointsA:
+            if is_close(xA, xB) and is_close(yA, yB):
+                matched = True
+                break
+
+        if matched:
+            if is_close(radiusA, radiusB):
+                color = "gray"
+            else:
+                color = "orange"  # サイズ違い
+        else:
+            color = "red"        # Bのみ
+
+        dwg.add(dwg.line(
+            start=(center_x, center_y),
+            end=(xB, yB),
+            stroke=color,
+            stroke_width=2
+        ))
+
+        dwg.add(dwg.circle(
+            center=(xB, yB),
+            r=radiusB,
+            fill=color
+        ))
+
+    # 中心
+    dwg.add(
+        dwg.circle(
+            center=(center_x, center_y),
+            r=10,
+            fill="black"
+        )
+    )
 
     return Response(content=dwg.tostring(), media_type="image/svg+xml")
 
