@@ -10,7 +10,7 @@ from pydantic import BaseModel
 from db.database import get_cursor
 from services.settings_service import save_setting, get_settings, delete_setting, update_setting
 from services.circle_service import create_circles_svg
-from services.diff_service import get_setting_by_id
+from services.diff_service import create_diff_svg
 
 app = FastAPI()
 
@@ -107,142 +107,9 @@ def update_setting(id: int, data: CircleRequest):
 
 @app.get("/diff")
 def diff(id1: int, id2: int):
-    # ① DBから取得
-    a = get_setting_by_id(id1)
-    b = get_setting_by_id(id2)
+    svg = create_diff_svg(id1, id2)
 
-    if not a or not b:
+    if not svg:
         return {"error": "not found"}
 
-    # ② パラメータ取得
-    countA, radiusA, ringA = a[1], a[2], a[3]
-    countB, radiusB, ringB = b[1], b[2], b[3]
-
-    # ③ SVG作成
-    width = 400
-    height = 400
-    center_x = width // 2
-    center_y = height // 2
-
-    dwg = svgwrite.Drawing(size=(f"{width}px", f"{height}px"))
-
-    is_same = (
-        countA == countB and
-        radiusA == radiusB and
-        ringA == ringB
-    )
-
-    # Aは青固定
-    colorA = "blue"
-
-    # Bは差分で変える
-    colorB = "blue" if is_same else "red"
-
-    # ④ 差分チェック
-
-    # ④ ここから「差分ロジック」を入れる
-    def is_close(a, b, tol=1e-3):
-        return abs(a - b) < tol
-
-    def is_same_point(a, b):
-        return (
-            is_close(a[0], b[0]) and
-            is_close(a[1], b[1])
-        )
-
-    # Aの点
-    pointsA = []
-    for i in range(countA):
-        angle = 2 * math.pi * i / countA
-        x = center_x + ringA * math.cos(angle)
-        y = center_y + ringA * math.sin(angle)
-        pointsA.append((x, y))
-
-    # Bの点
-    pointsB = []
-    for i in range(countB):
-        angle = 2 * math.pi * i / countB
-        x = center_x + ringB * math.cos(angle)
-        y = center_y + ringB * math.sin(angle)
-        pointsB.append((x, y))
-
-    # 判定関数
-    def in_points(target, points):
-        for px, py in points:
-            if is_close(target[0], px) and is_close(target[1], py):
-                return True
-        return False
-
-    # --- A描画 ---
-    # A側
-    for (xA, yA) in pointsA:
-
-        matched = False
-
-        for (xB, yB) in pointsB:
-            if is_close(xA, xB) and is_close(yA, yB):
-                matched = True
-                break
-
-        if matched:
-            if is_close(radiusA, radiusB):
-                color = "gray"   # 完全一致
-            else:
-                color = "orange" # 位置は同じだがサイズ違い
-        else:
-            color = "blue"       # Aのみ
-
-        dwg.add(dwg.line(
-            start=(center_x, center_y),
-            end=(xA, yA),
-            stroke=color,
-            stroke_width=2
-        ))
-
-        dwg.add(dwg.circle(
-            center=(xA, yA),
-            r=radiusA,
-            fill=color
-        ))
-
-    # --- B描画 ---
-    for (xB, yB) in pointsB:
-
-        matched = False
-
-        for (xA, yA) in pointsA:
-            if is_close(xA, xB) and is_close(yA, yB):
-                matched = True
-                break
-
-        if matched:
-            if is_close(radiusA, radiusB):
-                color = "gray"
-            else:
-                color = "orange"  # サイズ違い
-        else:
-            color = "red"        # Bのみ
-
-        dwg.add(dwg.line(
-            start=(center_x, center_y),
-            end=(xB, yB),
-            stroke=color,
-            stroke_width=2
-        ))
-
-        dwg.add(dwg.circle(
-            center=(xB, yB),
-            r=radiusB,
-            fill=color
-        ))
-
-    # 中心
-    dwg.add(
-        dwg.circle(
-            center=(center_x, center_y),
-            r=10,
-            fill="black"
-        )
-    )
-
-    return Response(content=dwg.tostring(), media_type="image/svg+xml")
+    return Response(content=svg, media_type="image/svg+xml")
