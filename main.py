@@ -8,6 +8,7 @@ import psycopg2
 from fastapi import Request
 from pydantic import BaseModel
 from db.database import get_cursor
+from services.settings_service import save_setting, get_settings, delete_setting, update_setting
 
 app = FastAPI()
 
@@ -98,21 +99,7 @@ def create_ring(
 
 @app.post("/save")
 def save_setting(data: CircleRequest):
-
-    conn, cur = get_cursor()
-
-# circle_settings = DBで作成したテーブル名
-    cur.execute(
-        """
-        INSERT INTO circle_settings (count, radius, ring_radius, color)
-        VALUES (%s, %s, %s, %s)
-        """,
-        (data.count, data.radius, data.ring_radius, data.color)
-    )
-
-    conn.commit() #  DBに保存
-    cur.close()
-    conn.close()
+    save_setting(data)
 
     return {"message": "saved"} # レスポンスを返す（Reactに成功！と返す）
 
@@ -120,60 +107,16 @@ def save_setting(data: CircleRequest):
 @app.get("/settings")
 def get_settings():
 
-    conn, cur = get_cursor()
-
-    cur.execute("SELECT * FROM circle_settings ORDER BY id DESC")
-    rows = cur.fetchall()
-
-    cur.close()
-    conn.close()
-
-    result = []
-    for row in rows:
-        result.append({
-            "id": row[0],
-            "count": row[1],
-            "radius": row[2],
-            "ring_radius": row[3],
-            "color": row[4],
-            "created_at": str(row[5])
-        })
-
-    return result
+    return get_settings()
 
 @app.delete("/settings/{id}")
 def delete_setting(id: int):
-
-    conn, cur = get_cursor()
-
-    cur.execute(
-        "DELETE FROM circle_settings WHERE id = %s",
-        (id,)
-    )
-
-    conn.commit()
-    cur.close()
-    conn.close()
-
+    delete_setting(id)
     return {"message": "deleted"}
 
 @app.put("/settings/{id}")
 def update_setting(id: int, data: CircleRequest):
-
-    conn, cur = get_cursor()
-
-    cur.execute(
-        """
-        UPDATE circle_settings
-        SET count = %s, radius = %s, ring_radius = %s, color = %s
-        WHERE id = %s
-        """,
-        (data.count, data.radius, data.ringRadius, data.color, id)
-    )
-    conn.commit()
-    cur.close()
-    conn.close()
-
+    update_setting(id, data)
     return {"message": "updated"}
 
 @app.get("/diff")
