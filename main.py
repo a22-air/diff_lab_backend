@@ -10,6 +10,7 @@ from pydantic import BaseModel
 from db.database import get_cursor
 from services.settings_service import save_setting, get_settings, delete_setting, update_setting
 from services.circle_service import create_circles_svg
+from services.diff_service import get_setting_by_id
 
 app = FastAPI()
 
@@ -107,11 +108,8 @@ def update_setting(id: int, data: CircleRequest):
 @app.get("/diff")
 def diff(id1: int, id2: int):
     # ① DBから取得
-    cur.execute("SELECT * FROM circle_settings WHERE id = %s", (id1,))
-    a = cur.fetchone()
-
-    cur.execute("SELECT * FROM circle_settings WHERE id = %s", (id2,))
-    b = cur.fetchone()
+    a = get_setting_by_id(id1)
+    b = get_setting_by_id(id2)
 
     if not a or not b:
         return {"error": "not found"}
