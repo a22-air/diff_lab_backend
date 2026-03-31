@@ -9,6 +9,7 @@ from fastapi import Request
 from pydantic import BaseModel
 from db.database import get_cursor
 from services.settings_service import save_setting, get_settings, delete_setting, update_setting
+from services.circle_service import create_circles_svg
 
 app = FastAPI()
 
@@ -29,24 +30,8 @@ app.add_middleware(
 @app.get("/circles")
 
 def create_circles(count: int = 5, radius: int = 30, gap: int = 10):
-
-    dwg = svgwrite.Drawing(size=("400px", "400px"))
-
-    start_x = 50
-    y = 100
-
-    for i in range(count):
-        x = start_x + i * (radius * 2 + gap)
-
-        dwg.add(
-            dwg.circle(
-                center=(x, y),
-                r=radius,
-                fill="blue"
-            )
-        )
-
-    return Response(content=dwg.tostring(), media_type="image/svg+xml")
+    svg = create_circles_svg(count, radius, gap)
+    return Response(content=svg, media_type="image/svg+xml")
 
 @app.get("/ring")
 def create_ring(
