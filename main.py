@@ -7,6 +7,7 @@ from fastapi.middleware.cors import CORSMiddleware
 import psycopg2
 from fastapi import Request
 from pydantic import BaseModel
+from db.database import get_cursor
 
 app = FastAPI()
 
@@ -98,10 +99,7 @@ def create_ring(
 @app.post("/save")
 def save_setting(data: CircleRequest):
 
-    count = data.count
-    radius = data.radius
-    ring_radius = data.ringRadius
-    color = data.color
+    conn, cur = get_cursor()
 
 # circle_settings = DBで作成したテーブル名
     cur.execute(
@@ -109,18 +107,26 @@ def save_setting(data: CircleRequest):
         INSERT INTO circle_settings (count, radius, ring_radius, color)
         VALUES (%s, %s, %s, %s)
         """,
-        (count, radius, ring_radius, color)
+        (data.count, data.radius, data.ring_radius, data.color)
     )
 
     conn.commit() #  DBに保存
+    cur.close()
+    conn.close()
 
     return {"message": "saved"} # レスポンスを返す（Reactに成功！と返す）
 
 # DBから全部取ってJSONに変換
 @app.get("/settings")
 def get_settings():
+
+    conn, cur = get_cursor()
+
     cur.execute("SELECT * FROM circle_settings ORDER BY id DESC")
     rows = cur.fetchall()
+
+    cur.close()
+    conn.close()
 
     result = []
     for row in rows:
@@ -137,16 +143,25 @@ def get_settings():
 
 @app.delete("/settings/{id}")
 def delete_setting(id: int):
+
+    conn, cur = get_cursor()
+
     cur.execute(
         "DELETE FROM circle_settings WHERE id = %s",
         (id,)
     )
+
     conn.commit()
+    cur.close()
+    conn.close()
 
     return {"message": "deleted"}
 
 @app.put("/settings/{id}")
 def update_setting(id: int, data: CircleRequest):
+
+    conn, cur = get_cursor()
+
     cur.execute(
         """
         UPDATE circle_settings
@@ -156,6 +171,8 @@ def update_setting(id: int, data: CircleRequest):
         (data.count, data.radius, data.ringRadius, data.color, id)
     )
     conn.commit()
+    cur.close()
+    conn.close()
 
     return {"message": "updated"}
 
@@ -303,12 +320,3 @@ def diff(id1: int, id2: int):
     )
 
     return Response(content=dwg.tostring(), media_type="image/svg+xml")
-
-conn = psycopg2.connect(
-    dbname="circle_db",
-    user="taniguchi.airi",
-    password="",
-    host="localhost"
-)
-
-cur = conn.cursor()
